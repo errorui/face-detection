@@ -1,32 +1,28 @@
 FROM python:3.10-slim
 
-# Install system dependencies needed for dlib + face-recognition
+# Install required build tools and dependencies
 RUN apt-get update && apt-get install -y \
-    cmake \
-    g++ \
     build-essential \
-    libboost-all-dev \
+    cmake \
+    git \
+    wget \
+    curl \
+    unzip \
     libopenblas-dev \
     liblapack-dev \
     libx11-dev \
     libgtk-3-dev \
-    git \
-    curl \
     && apt-get clean
 
-# Install Python packaging tools
-RUN pip install --upgrade pip wheel setuptools
+# Upgrade CMake to a newer version
+RUN curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.sh -o cmake.sh && \
+    mkdir /opt/cmake && \
+    sh cmake.sh --skip-license --prefix=/opt/cmake && \
+    ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake
 
-# Set work directory
+# Continue with your setup
 WORKDIR /app
+COPY . /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --prefer-binary -r requirements.txt
-
-# Copy app code
-COPY . .
-
-# Expose port and run
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
