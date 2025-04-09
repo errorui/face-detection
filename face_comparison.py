@@ -148,7 +148,7 @@ async def compare_faces_from_urls(request: Request):
         os.remove(path)
 
     if not results:
-        return {"message": "No valid faces found in provided image URLs."}
+        return {"message": "No validdddddddd faces found in provided image URLs."}
 
     any_match = any(r["match"] for r in results)
     return {
