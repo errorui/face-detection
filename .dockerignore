@@ -1,0 +1,31 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore log files
+*.log
+logs/
+
+# Ignore node_modules (if somehow present)
+node_modules/
+
+# Ignore Docker-related cache/config
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Ignore hidden files (like .env, .git, etc.)
+.*
+
+# Ignore image cache/output folders
+uploaded_images/
+outputs/
+tmp/
+
+# Ignore sample data
+sample_person/
