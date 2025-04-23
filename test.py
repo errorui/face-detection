@@ -1,47 +1,59 @@
 import requests
 import time
+from PIL import Image
+import numpy as np
 
-# URL of the FastAPI endpoint
-url = "https://face-api-295757475593.asia-south1.run.app/recognize-face/"  # Update if you deploy your API elsewhere
+url = "http://localhost:8000/recognize-face/"
+url2="http://localhost:8000/recognize-face-rgb565/"
+# Image path
+image_path = r"sample_person/WhatsApp Image 2025-04-11 at 5.38.18 PM (1).jpeg"
 
-# Absolute path to the images you want to upload for testing
-image_path = r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2025-01-06 213918.png"
-image_einstens = r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2025-01-16 131001.png"
-image_manik = r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2025-02-06 223643.png"
-image_sarthak = r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2025-02-05 210552.png"
-image_pandey = r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2025-03-16 104529.png"
-image_raj2=r"C:\Users\Raj Raman\Pictures\Screenshots\Screenshot 2024-12-08 133137.png"
-image_singer=r"C:\Users\Raj Raman\Downloads\WhatsApp Image 2025-04-11 at 7.22.06 PM.jpeg"
-image_singe2r=r"C:\Users\Raj Raman\Desktop\work\facedetection\sample_person\a.png"
-image_singe23r=r"C:\Users\Raj Raman\Downloads\WhatsApp Image 2025-04-11 at 7.22.07 PM (1).jpeg"
-image_singe231r=r"C:\Users\Raj Raman\Downloads\WhatsApp Image 2025-04-11 at 7.22.05 PM (1).jpeg"
-image_singe2311r=r"C:\Users\Raj Raman\Downloads\WhatsApp Image 2025-04-11 at 7.22.05 PM.jpeg"
-test3=r"C:\Users\Raj Raman\Downloads\test3.jpeg"
+# Convert and return RGB565 byte data
+# Convert and return RGB565 byte data
+def convert_image_to_rgb565(image_path):
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        img_array = np.array(img)
+        # Convert RGB888 to RGB565: RGB565 uses 16 bits (2 bytes) per pixel
+        rgb565 = ((img_array[..., 0] >> 3) << 11) | \
+                 ((img_array[..., 1] >> 2) << 5) | \
+                 (img_array[..., 2] >> 3)
+        # Ensure that the array is in 16-bit format (each pixel is 2 bytes)
+        return rgb565.astype(np.uint16).tobytes(), img.size  # Return size as (width, height)
 
-images = [image_path, image_einstens, image_manik, image_sarthak, image_pandey,image_raj2,image_singer,image_singe2r,image_singe23r,image_singe231r,image_singe2311r,test3]
+# Send request to API
+def send_request(image_path, convert_to_rgb565=False):
+    data = {}
+    if convert_to_rgb565:
+        rgb565_bytes, (width, height) = convert_image_to_rgb565(image_path)
+        files = {
+            "file": ("image.rgb565", rgb565_bytes, "application/octet-stream"),
+        }
+        # Pass width and height in the URL as query parameters
+        url_with_params = f"{url2}?width={width}&height={height}"
+    else:
+        with open(image_path, "rb") as image_file:
+            image_data = image_file.read()
+            files = {
+                "file": ("image.jpg", image_data, "image/jpeg"),
+                "format": (None, "RGB888")
+            }
+        url_with_params = f"{url}?format=RGB888"  # Assuming you want to pass the format in the URL as well
 
-# Function to handle API requests with retries
-def send_request(image):
-    with open(image, "rb") as image_file:
-        files = {"file": ("a.png", image_file, "image/png")}  # Use the correct MIME type for .png
-        
-        retries = 3  # Retry limit
-        for _ in range(retries):
-            try:
-                response = requests.post(url, files=files)
-                
-                if response.status_code == 200:
-                    print(f"Prediction result for {image}:", response.json())
-                    return response.json()
-                else:
-                    print(f"Error for {image}: {response.status_code} - {response.json()}")
-                    break
-            except requests.exceptions.RequestException as e:
-                print(f"Error while requesting {image}: {e}. Retrying...")
-                time.sleep(3)  # Wait for 3 seconds before retrying
-        else:
-            print(f"Failed to get a valid response for {image} after {retries} attempts.")
+    retries = 3
+    for attempt in range(retries):
+        try:
+            response = requests.post(url_with_params, files=files)  # Use the full URL with query params
+            if response.status_code == 200:
+                print(f"✅ Prediction for {image_path}: {response.json()}")
+                return response.json()
+            else:
+                print(f"❌ Error {response.status_code}: {response.text}")
+                break
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Request failed: {e}. Retrying ({attempt + 1}/{retries})...")
+            time.sleep(2)
 
-# Test the API with multiple images
-for image in images:
-    send_request(image)
+    print("❌ Request failed after retries.")
+
+send_request(image_path, convert_to_rgb565=True)
