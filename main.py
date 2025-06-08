@@ -8,7 +8,9 @@ import face_recognition
 import pickle
 import logging
 import base64
-
+import time
+from collections import defaultdict
+from fastapi import Request
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -202,3 +204,53 @@ async def toggle_value():
     except Exception as e:
         logger.error(f"Error toggling value: {e}")
         raise HTTPException(status_code=500, detail="Unable to toggle value")
+# Track request counts and total response times
+request_stats = defaultdict(lambda: {"count": 0, "total_time": 0.0})
+
+@app.middleware("http")
+async def track_performance(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+
+    path = request.url.path
+    request_stats[path]["count"] += 1
+    request_stats[path]["total_time"] += duration
+
+    return response
+@app.get("/metrics", response_class=HTMLResponse)
+async def get_metrics():
+    try:
+        with open("a.txt", "r") as f:
+            toggle_value = f.read().strip()
+    except:
+        toggle_value = "unknown"
+
+    rows = ""
+    for endpoint, stats in request_stats.items():
+        count = stats["count"]
+        avg_time = stats["total_time"] / count if count > 0 else 0
+        rows += f"<tr><td>{endpoint}</td><td>{count}</td><td>{avg_time:.4f}s</td></tr>"
+
+    html = f"""
+    <html>
+    <head>
+        <title>API Performance Metrics</title>
+        <style>
+            table {{ border-collapse: collapse; width: 60%; }}
+            th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+    </head>
+    <body>
+        <h2>API Metrics</h2>
+        <p><strong>Toggle value:</strong> {toggle_value}</p>
+        <table>
+            <tr><th>Endpoint</th><th>Requests</th><th>Avg. Response Time</th></tr>
+            {rows}
+        </table>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+    
